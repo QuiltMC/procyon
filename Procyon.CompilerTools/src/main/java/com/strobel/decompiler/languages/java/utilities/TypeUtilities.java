@@ -362,9 +362,17 @@ public final class TypeUtilities {
                     return null;
                 }
 
-                final MethodReference method = (MethodReference) callSite.getBootstrapArguments().get(0);
+                for (Object argument : callSite.getBootstrapArguments()) {
+                    if (argument instanceof MethodReference) {
+                        return ((MethodReference) argument).getDeclaringType();
+                    }
 
-                return method.getDeclaringType();
+                    if (argument instanceof MethodHandle) {
+                        return ((MethodHandle) argument).getMethod().getDeclaringType();
+                    }
+                }
+
+                return null;
             }
             else {
                 final MethodDeclaration method = firstOrDefault(parent.getAncestors(MethodDeclaration.class));
