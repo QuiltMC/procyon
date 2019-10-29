@@ -5,32 +5,15 @@ apply plugin: 'java'
 apply plugin: 'maven'
 apply plugin: 'idea'
 
-archivesBaseName = 'procyon'
+archivesBaseName = 'procyon-quilt'
 
+// quilt says otherwise
 ext.getProcyonVersion = { ->
-    final def fallbackVersion = "1.0-SNAPSHOT"
-    final def versionFilePath = rootDir.canonicalPath + "/Procyon.Core/src/main/java/com/strobel/Procyon.java"
-    final def versionFile = new File(versionFilePath)
-
-    if (versionFile.exists()) {
-        try {
-            final String fileContents = new File(versionFilePath).getText('UTF-8')
-            final def matcher = fileContents =~ /VERSION\s*=\s*"([^"]+)"/
-
-            if (matcher.find()) {
-                return matcher.group(1).trim()
-            }
-        }
-        catch (final Throwable ignored) {
-        }
-    }
-
-    logger.warn("wARNING: Could not resolve version from source; falling back to '$fallbackVersion'.")
-
-    return fallbackVersion
+    return "0.5.35"
 }
 
-final def procyonVersion = getProcyonVersion()
+def ENV = System.getenv()
+final def procyonVersion = getProcyonVersion() + "." + (ENV.BUILD_NUMBER ?: "local")
 
 allprojects {
     apply plugin: 'java'
@@ -41,8 +24,8 @@ allprojects {
 
     version procyonVersion
 
-    group 'org.bitbucket.mstrobel'
-    sourceCompatibility = 1.7    // JDK version
+    group 'dev.quiltmc'
+    sourceCompatibility = 1.8    // JDK version
 
     repositories {
         mavenCentral()
@@ -62,11 +45,11 @@ rootProject.uploadArchives.enabled = false
 
 subprojects {
     apply plugin: 'maven'
-    apply plugin: 'signing'
+    apply plugin: 'maven-publish'
 
     final boolean shouldSign = "true".equalsIgnoreCase(System.properties.getProperty("procyon.signing.enabled"))
 
-    archivesBaseName = "procyon-${(it.name as String).split('\\.')[1].toLowerCase()}"
+    archivesBaseName = 'procyon-quilt-' + it.name.split("\\.")[1].toLowerCase()
 
     jar {
         metaInf {
@@ -126,86 +109,32 @@ subprojects {
             options.encoding = 'UTF-8'
         }
 
-        artifacts {
-            archives jar
-            archives javadocJar
-            archives sourcesJar
-        }
+        publishing {
+            publications {
+                maven(MavenPublication) {
+                    groupId project.group
+                    artifactId project.archivesBaseName
+                    version project.version
 
-        if (shouldSign) {
-            signing {
-                sign configurations.archives
-            }
-        }
+                    from components.java
 
-        uploadArchives {
-            repositories.mavenDeployer {
-                if (shouldSign) {
-                    beforeDeployment { MavenDeployment deployment ->
-                        signing.signPom(deployment)
+                    artifact javadocJar {
+                        classifier "javadoc"
+                    }
+
+                    artifact sourcesJar {
+                        classifier "sources"
                     }
                 }
+            }
 
-                snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots") {
-                    authentication(userName: project.properties.get("procyon.sonatype.username"),
-                                   password: project.properties.get("procyon.sonatype.password"))
-                }
-
-                repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2") {
-                    authentication(userName: project.properties.get("procyon.sonatype.username"),
-                                   password: project.properties.get("procyon.sonatype.password"))
-                }
-
-                pom {
-                    groupId = project.group
-                    version = project.version
-                    artifactId = project.archivesBaseName
-
-                    project {
-                        name project.archivesBaseName
-                        packaging 'jar'
-                        description 'Procyon'
-                        url 'https://bitbucket.org/mstrobel/procyon'
-
-                        scm {
-                            url 'https://bitbucket.org/mstrobel/procyon'
-                            connection 'scm:hg:https://hg@bitbucket.org/mstrobel/procyon'
-                            developerConnection 'scm:hg:https://mstrobel@bitbucket.org/mstrobel/procyon'
-                        }
-
-                        issueManagement {
-                            system 'jira'
-                            url 'https://bitbucket.org/mstrobel/procyon/issues'
-                        }
-
-                        licenses {
-                            license {
-                                name 'The Apache Software License, Version 2.0'
-                                url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                                distribution 'repo'
-                            }
-                        }
-
-                        developers {
-                            developer {
-                                id 'mstrobel'
-                                name 'Mike Strobel'
-                                roles {
-                                    role 'owner'
-                                    role 'packager'
-                                    role 'developer'
-                                }
-                            }
-                        }
-
-                        dependencies {
-                            dependency {
-                                groupId 'junit'
-                                artifactId 'junit'
-                                version '4.11'
-                                scope 'test'
-//                                optional = true
-                            }
+            repositories {
+                if (ENV.MAVEN_URL) {
+                    maven {
+                        url ENV.MAVEN_URL
+                        credentials {
+                            username ENV.MAVEN_USERNAME
+                            password ENV.MAVEN_PASSWORD
                         }
                     }
                 }
@@ -213,4 +142,3 @@ subprojects {
         }
     }
 }
-
