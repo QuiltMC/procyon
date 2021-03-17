@@ -24,7 +24,7 @@ allprojects {
 
     version procyonVersion
 
-    group 'dev.quiltmc'
+    group 'org.quiltmc'
     sourceCompatibility = 1.8    // JDK version
 
     repositories {
